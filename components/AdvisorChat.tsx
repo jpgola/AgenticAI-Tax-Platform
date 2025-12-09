@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, AlertTriangle, X } from 'lucide-react';
+import { Send, User, Bot, AlertTriangle, X, Download } from 'lucide-react';
 import { ChatMessage } from '../types';
 
 interface AdvisorChatProps {
@@ -26,6 +26,23 @@ const AdvisorChat: React.FC<AdvisorChatProps> = ({ isOpen, onClose, messages, on
     setInput('');
   };
 
+  const handleExportChat = () => {
+    if (messages.length === 0) return;
+    
+    const chatHistory = messages.map(msg => 
+      `[${new Date(msg.timestamp).toLocaleString()}] ${msg.role.toUpperCase()}: ${msg.content}`
+    ).join('\n\n');
+    
+    const blob = new Blob([chatHistory], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `tax_advisor_chat_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -44,9 +61,18 @@ const AdvisorChat: React.FC<AdvisorChatProps> = ({ isOpen, onClose, messages, on
             </div>
           </div>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={handleExportChat} 
+                className="text-slate-400 hover:text-white transition-colors"
+                title="Export Chat History"
+            >
+                <Download className="w-5 h-5" />
+            </button>
+            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+            </button>
+        </div>
       </div>
 
       {/* Messages */}

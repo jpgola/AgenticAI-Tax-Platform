@@ -1,5 +1,5 @@
 {
-  "name": "Copy of AgenticAI Tax Platform",
+  "name": "AgenticAI Tax Platform",
   "description": "A modular, AI-powered tax filing platform that automates workflows and provides transparent, agentic insights.",
   "requestFramePermissions": [
     "microphone"
