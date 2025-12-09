@@ -6,6 +6,7 @@ import { AgentType, AgentStatus, DeductionItem, TaxDocument, RiskItem } from '..
 
 interface DashboardProps {
   onAskAdvisor: (question: string) => void;
+  onContextUpdate?: (context: { deductions: DeductionItem[]; risks: RiskItem[] }) => void;
 }
 
 interface AuditLogItem {
@@ -13,7 +14,7 @@ interface AuditLogItem {
   message: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor }) => {
+const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) => {
   const [activeAgent, setActiveAgent] = useState<AgentType | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [logs, setLogs] = useState<string[]>([]); // For visualizer (newest first)
@@ -26,6 +27,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor }) => {
   const [filingComplete, setFilingComplete] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [filingProgress, setFilingProgress] = useState(0);
+
+  // Sync context to parent App for Chat Advisor awareness
+  useEffect(() => {
+    if (onContextUpdate) {
+      onContextUpdate({ deductions, risks });
+    }
+  }, [deductions, risks, onContextUpdate]);
 
   // Mock Data for Charts
   const data = [

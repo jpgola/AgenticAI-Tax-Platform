@@ -3,7 +3,7 @@ import { HashRouter } from 'react-router-dom';
 import { LayoutDashboard, FileText, Settings, HelpCircle, Bell, Menu, X } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import AdvisorChat from './components/AdvisorChat';
-import { ChatMessage } from './types';
+import { ChatMessage, DeductionItem, RiskItem } from './types';
 import { sendMessageToGemini } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -18,6 +18,9 @@ const App: React.FC = () => {
     }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  
+  // State to hold tax context from Dashboard
+  const [taxContext, setTaxContext] = useState<{deductions: DeductionItem[], risks: RiskItem[]} | null>(null);
 
   const handleSendMessage = async (text: string) => {
     const userMsg: ChatMessage = {
@@ -30,7 +33,23 @@ const App: React.FC = () => {
     setIsTyping(true);
 
     try {
-        const responseText = await sendMessageToGemini(chatMessages, text);
+        // Prepare the message for the AI. If specific phrasing is detected, inject context.
+        let apiMessage = text;
+        const lowerText = text.toLowerCase();
+        
+        if (taxContext && (lowerText.includes('explain my entire return') || lowerText.includes('walk me through my return'))) {
+             apiMessage = `
+             [SYSTEM NOTE: The user is asking for a comprehensive summary. Here is the active tax context from the dashboard agents:
+             Deductions Found: ${JSON.stringify(taxContext.deductions)}
+             Risks Identified: ${JSON.stringify(taxContext.risks)}
+             
+             Please provide a structured, friendly summary of their return status, highlighting the key deductions found and any risks they should be aware of. Use the data provided above.]
+             
+             ${text}
+             `;
+        }
+
+        const responseText = await sendMessageToGemini(chatMessages, apiMessage);
         const modelMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'model',
@@ -48,6 +67,10 @@ const App: React.FC = () => {
   const handleAskAdvisor = (question: string) => {
       setIsChatOpen(true);
       handleSendMessage(question);
+  };
+  
+  const handleContextUpdate = (context: { deductions: DeductionItem[]; risks: RiskItem[] }) => {
+      setTaxContext(context);
   };
 
   return (
@@ -107,7 +130,7 @@ const App: React.FC = () => {
 
           {/* Page Content */}
           <main className="flex-1 overflow-auto">
-            <Dashboard onAskAdvisor={handleAskAdvisor} />
+            <Dashboard onAskAdvisor={handleAskAdvisor} onContextUpdate={handleContextUpdate} />
           </main>
         </div>
 
