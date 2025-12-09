@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle, ShieldCheck } from 'lucide-react';
+import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle, ShieldCheck, Archive, Lightbulb } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AgentVisualizer from './AgentVisualizer';
 import { AgentType, AgentStatus, DeductionItem, TaxDocument, RiskItem } from '../types';
@@ -27,6 +27,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
   const [filingComplete, setFilingComplete] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [filingProgress, setFilingProgress] = useState(0);
+
+  // Tax Tips Data
+  const taxTips = [
+    "Freelancers can often deduct a portion of their home internet bill if used for business.",
+    "You can deduct up to $2,500 of student loan interest paid during the year, even if you don't itemize.",
+    "Contributing to a traditional IRA or 401(k) directly reduces your taxable income for the year.",
+    "Don't forget charitable donations! Keep receipts for cash and goods donated to qualified non-profits.",
+    "The 'Saver's Credit' offers a tax break for low-to-moderate income earners saving for retirement.",
+    "Medical expenses are deductible only if they exceed 7.5% of your adjusted gross income."
+  ];
+
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prev) => (prev + 1) % taxTips.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync context to parent App for Chat Advisor awareness
   useEffect(() => {
@@ -67,6 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
         name: '1099-NEC_TechStream.pdf',
         type: '1099-NEC',
         status: 'verified',
+        confidenceScore: 0.99,
         uploadDate: new Date().toLocaleDateString()
     }]);
 
@@ -149,6 +169,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
       addLog("Validation Agent: Checking TIN match...");
       await new Promise(r => setTimeout(r, 1200));
       addLog("Validation Agent: No discrepancies found.");
+
+      // Update document status to verified
+      setDocuments(prev => prev.map(d => d.name === file.name ? { ...d, status: 'verified', confidenceScore: 0.99 } : d));
       
       // ADVISOR AGENT (Deduction Discovery)
       setActiveAgent(AgentType.ADVISOR);
@@ -265,6 +288,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
     alert("Downloading tax_return_2024.pdf...");
   };
 
+  const handleDownloadConfirmation = () => {
+    alert("Downloading IRS_Confirmation_Receipt_2024-X99.pdf...");
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
       
@@ -314,7 +341,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
         {step === 1 && (
           <div className="space-y-4">
             {showUploadGuide && (
-              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 relative animate-in fade-in slide-in-from-top-2">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 relative animate-in fade-in slide-in-from-top-2 shadow-sm">
                 <button 
                   onClick={() => setShowUploadGuide(false)} 
                   className="absolute top-3 right-3 text-indigo-400 hover:text-indigo-600 transition-colors"
@@ -330,7 +357,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                   <div>
                     <h4 className="font-semibold text-indigo-900 text-sm">Smart Document Intake</h4>
                     <p className="text-sm text-indigo-700 mt-1 max-w-lg">
-                      Uploading documents allows our <strong>Intake & Extraction Agents</strong> to auto-fill your return with high accuracy, ensuring you get every deduction you deserve.
+                      Upload your <strong>W-2s, 1099-INTs, and receipts</strong> to let our agents auto-fill your return. This ensures 100% accuracy and helps identify every deduction you qualify for.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-white text-indigo-700 border border-indigo-200 shadow-sm">
@@ -409,8 +436,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                           <div className="font-medium text-slate-900">{deduction.category}</div>
                           <div className="text-sm text-slate-500">{deduction.description}</div>
                           <button 
-                            onClick={() => onAskAdvisor(`Please provide a detailed explanation for the ${deduction.category} deduction of $${deduction.amount.toLocaleString()}. Explain the specific IRS criteria I met based on my documents and any documentation requirements I should maintain.`)}
-                            className="mt-2 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors"
+                            onClick={() => onAskAdvisor(`Regarding the ${deduction.category} deduction of $${deduction.amount.toLocaleString()} that was identified: "${deduction.explanation}". Could you provide a detailed explanation of the IRS criteria for this and what documentation is required?`)}
+                            className="mt-2 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors active:scale-95"
                           >
                             <Bot className="w-3 h-3" /> Explain My Return
                           </button>
@@ -548,30 +575,56 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                     </div>
                     <div>
                         <h2 className="text-3xl font-bold text-slate-900">Return Filed!</h2>
-                        <p className="text-emerald-600 font-medium mt-2">Accepted by IRS • Ref #2024-X99-AGNT</p>
+                        <p className="text-emerald-600 font-medium mt-2">Accepted by IRS</p>
+
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600">
+                              <Archive className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>Permanently archived by <strong>Memory Agent</strong></span>
+                          </div>
+                        </div>
                     </div>
                     
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-left space-y-3">
-                        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                             <span className="text-slate-500 text-sm">Federal Refund</span>
-                             <span className="font-bold text-slate-900 text-lg">$2,840.00</span>
+                    <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 text-left space-y-4 shadow-sm">
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                             <span className="text-slate-500 text-sm font-medium">Federal Refund</span>
+                             <span className="font-bold text-emerald-600 text-xl">$2,840.00</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                             <span className="text-slate-500 text-sm">Filing Date</span>
-                             <span className="font-medium text-slate-900">{new Date().toLocaleDateString()}</span>
+                        <div className="space-y-3 pt-1">
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-500 text-sm">Submission Date</span>
+                                <span className="font-medium text-slate-900">{new Date().toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-500 text-sm">Submission Time</span>
+                                <span className="font-medium text-slate-900">{new Date().toLocaleTimeString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-500 text-sm">Confirmation #</span>
+                                <span className="font-mono font-medium text-slate-900 bg-slate-200 px-2 py-0.5 rounded text-xs">2024-X99-AGNT</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3 pt-2">
                         <button 
-                           onClick={handleDownload}
-                           className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-medium"
+                           onClick={handleDownloadConfirmation}
+                           className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3.5 rounded-lg transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold text-base"
                         >
-                            <Download className="w-4 h-4" /> Download Return PDF
+                            <FileText className="w-5 h-5" /> Download Filing Confirmation
                         </button>
-                        <button onClick={() => window.location.reload()} className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors font-medium">
-                            Dashboard
-                        </button>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                            onClick={handleDownload}
+                            className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-lg transition-colors font-medium shadow-sm"
+                            >
+                                <Download className="w-4 h-4" /> Return PDF
+                            </button>
+                            <button onClick={() => window.location.reload()} className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-lg transition-colors font-medium shadow-sm">
+                                Dashboard
+                            </button>
+                        </div>
                     </div>
                  </div>
              )}
@@ -614,22 +667,66 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           <div className="p-4 border-b border-slate-200 font-semibold text-slate-800">
             Document Vault
           </div>
-          <div className="p-2">
+          <div className="p-2 space-y-1">
             {documents.length === 0 ? (
                 <div className="p-4 text-center text-sm text-slate-400">No documents yet</div>
             ) : (
                 documents.map(doc => (
-                    <div key={doc.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg">
-                        <FileText className="w-8 h-8 text-indigo-400 bg-indigo-50 p-1.5 rounded" />
-                        <div className="overflow-hidden">
-                            <div className="text-sm font-medium text-slate-900 truncate">{doc.name}</div>
-                            <div className="text-xs text-slate-500">{doc.type} • {doc.uploadDate}</div>
+                    <div key={doc.id} className="group p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all">
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0">
+                             <FileText className="w-8 h-8 text-indigo-500 bg-indigo-50 p-1.5 rounded-lg" />
                         </div>
-                        <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-sm font-medium text-slate-900 truncate pr-2">{doc.name}</span>
+                                {doc.status === 'verified' && (
+                                     <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                                )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                                <span className="font-medium bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">{doc.type}</span>
+                                <span>{doc.uploadDate}</span>
+                            </div>
+
+                            {doc.status === 'verified' ? (
+                                <div className="flex items-center gap-2 text-[10px] bg-emerald-50/50 p-1.5 rounded border border-emerald-100/50">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                    <span className="text-emerald-700 font-medium">Verified by Validation Agent</span>
+                                    {doc.confidenceScore && (
+                                        <span className="ml-auto text-emerald-600 font-mono font-bold">{(doc.confidenceScore * 100).toFixed(0)}%</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                    <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></div>
+                                    Processing verification...
+                                </div>
+                            )}
+                        </div>
+                      </div>
                     </div>
                 ))
             )}
           </div>
+        </div>
+
+        {/* Tax Tip of the Day */}
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl shadow-lg text-white p-5 relative overflow-hidden transition-all hover:shadow-xl">
+            <div className="absolute -right-6 -top-6 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>
+            <div className="absolute -left-6 -bottom-6 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>
+            
+            <div className="flex items-center gap-2 mb-3 relative z-10">
+                <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
+                    <Lightbulb className="w-4 h-4 text-yellow-300" />
+                </div>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-indigo-100">Tax Tip</h4>
+            </div>
+            
+            <p key={currentTipIndex} className="text-sm font-medium leading-relaxed opacity-95 relative z-10 animate-in fade-in slide-in-from-right-2 duration-500">
+                "{taxTips[currentTipIndex]}"
+            </p>
         </div>
 
       </div>

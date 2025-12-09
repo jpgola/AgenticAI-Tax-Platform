@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { HashRouter } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, HelpCircle, Bell, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, HelpCircle, Bell, Menu, X, LogOut } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import AdvisorChat from './components/AdvisorChat';
+import Login from './components/Login';
 import { ChatMessage, DeductionItem, RiskItem } from './types';
 import { sendMessageToGemini } from './services/geminiService';
 
 const App: React.FC = () => {
+  // Authentication State
+  const [user, setUser] = useState<{name: string, email: string} | null>(null);
+
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -21,6 +25,23 @@ const App: React.FC = () => {
   
   // State to hold tax context from Dashboard
   const [taxContext, setTaxContext] = useState<{deductions: DeductionItem[], risks: RiskItem[]} | null>(null);
+
+  const handleLogin = (email: string) => {
+    // Extract name from email for demo purposes, capitalize first letter
+    const namePart = email.split('@')[0];
+    const formattedName = namePart.split('.').map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(' ');
+    
+    setUser({
+        name: formattedName || 'Demo User',
+        email: email
+    });
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setIsChatOpen(false);
+    // Optionally reset other states here if needed for a fresh session
+  };
 
   const handleSendMessage = async (text: string) => {
     const userMsg: ChatMessage = {
@@ -73,6 +94,11 @@ const App: React.FC = () => {
       setTaxContext(context);
   };
 
+  // If not authenticated, show login screen
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <HashRouter>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
@@ -93,10 +119,17 @@ const App: React.FC = () => {
             <NavItem icon={<Settings />} label="Settings" />
           </nav>
 
-          <div className="p-4 border-t border-slate-800">
+          <div className="p-4 border-t border-slate-800 space-y-2">
              <button className="flex items-center gap-3 text-slate-400 hover:text-white transition-colors text-sm font-medium w-full p-2 rounded-lg hover:bg-slate-800">
                 <HelpCircle className="w-5 h-5" />
                 Help & Support
+             </button>
+             <button 
+                onClick={handleLogout}
+                className="flex items-center gap-3 text-slate-400 hover:text-red-300 transition-colors text-sm font-medium w-full p-2 rounded-lg hover:bg-slate-800 group"
+             >
+                <LogOut className="w-5 h-5 group-hover:text-red-400 transition-colors" />
+                Sign Out
              </button>
           </div>
         </aside>
@@ -114,7 +147,7 @@ const App: React.FC = () => {
             </div>
             
             <div className="hidden md:block text-sm text-slate-500">
-              Welcome back, <span className="font-semibold text-slate-900">John Doe</span>
+              Welcome back, <span className="font-semibold text-slate-900">{user.name}</span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -122,8 +155,14 @@ const App: React.FC = () => {
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
               </button>
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs border border-indigo-200">
-                JD
+              <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
+                  <div className="text-right hidden sm:block">
+                      <div className="text-xs font-semibold text-slate-900">{user.name}</div>
+                      <div className="text-[10px] text-slate-500">{user.email}</div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs border border-indigo-200">
+                    {user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                  </div>
               </div>
             </div>
           </header>
