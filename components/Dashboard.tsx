@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle, ShieldCheck, Archive, Lightbulb } from 'lucide-react';
+import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle, ShieldCheck, Archive, Lightbulb, ChevronDown, ChevronUp, HelpCircle, Loader2, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AgentVisualizer from './AgentVisualizer';
 import { AgentType, AgentStatus, DeductionItem, TaxDocument, RiskItem } from '../types';
@@ -26,7 +26,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
   const [showUploadGuide, setShowUploadGuide] = useState(true);
   const [filingComplete, setFilingComplete] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showCPAModal, setShowCPAModal] = useState(false);
   const [filingProgress, setFilingProgress] = useState(0);
+  const [expandedDeductionId, setExpandedDeductionId] = useState<string | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Tax Tips Data
   const taxTips = [
@@ -65,6 +68,41 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
       setAuditLogs(prev => [...prev, { timestamp: new Date(), message: msg }]);
   };
 
+  const toggleDeduction = (id: string) => {
+    if (expandedDeductionId === id) {
+        setExpandedDeductionId(null);
+    } else {
+        setExpandedDeductionId(id);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (deductions.length === 0) return;
+
+    const headers = ['Category', 'Amount', 'Description', 'Confidence', 'Source'];
+    const rows = deductions.map(d => [
+      d.category,
+      d.amount.toString(),
+      `"${d.description.replace(/"/g, '""')}"`,
+      `${(d.confidence * 100).toFixed(0)}%`,
+      d.sourceDocId || 'System'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'tax_deductions_2024.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleRunDemo = () => {
     // Populate Audit Logs
     const demoLogs = [
@@ -98,7 +136,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           amount: 1450, 
           description: 'Simplified method (300 sq ft)', 
           confidence: 0.95,
-          explanation: 'Your address has remained consistent, and you are a 1099 contractor. The simplified method is low-risk.'
+          explanation: 'Your address has remained consistent, and you are a 1099 contractor. The simplified method is low-risk.',
+          sourceDocId: 'FORM-8829-REF'
         },
         { 
           id: 'd2', 
@@ -106,7 +145,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           amount: 2899, 
           description: 'MacBook Pro 16" & Peripherals', 
           confidence: 0.98,
-          explanation: 'Found purchase in "Best Buy" transaction log on Dec 12th. Fully deductible as business equipment.'
+          explanation: 'Found purchase in "Best Buy" transaction log on Dec 12th. Fully deductible as business equipment.',
+          sourceDocId: 'BANK-TX-992'
         },
         { 
           id: 'd3', 
@@ -114,7 +154,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           amount: 3200, 
           description: 'Flight/Hotel for TechConf 2024', 
           confidence: 0.85,
-          explanation: 'Transactions match conference dates. Ensure you keep the conference agenda as proof of business intent.'
+          explanation: 'Transactions match conference dates. Ensure you keep the conference agenda as proof of business intent.',
+          sourceDocId: 'CC-STMT-JAN'
         }
     ]);
 
@@ -186,7 +227,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           amount: 1200, 
           description: 'Calculated based on square footage used for freelance work.', 
           confidence: 0.92,
-          explanation: 'Since you uploaded a 1099-NEC (Freelance), and your address history matches, you likely qualify for the simplified home office deduction.'
+          explanation: 'Since you uploaded a 1099-NEC (Freelance), and your address history matches, you likely qualify for the simplified home office deduction.',
+          sourceDocId: 'OCR-DOC-1'
         },
         { 
           id: '2', 
@@ -194,7 +236,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
           amount: 450, 
           description: 'Adobe Creative Cloud & Hosting', 
           confidence: 0.98,
-          explanation: 'Recurring payments to "Adobe" found in connected bank statement linked to your freelance activity.'
+          explanation: 'Recurring payments to "Adobe" found in connected bank statement linked to your freelance activity.',
+          sourceDocId: 'LINKED-BANK-A'
         }
       ];
       setDeductions(newDeductions);
@@ -240,41 +283,44 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
         setActiveAgent(AgentType.FILING);
         setAgentStatus(AgentStatus.WORKING);
         
-        // Granular Step 1: Validation
-        addLog("Filing Agent: Initiating final validation sequence...");
+        // Granular Step 1: Validating Data
+        addLog("Filing Agent: Validating Data...");
         await new Promise(r => setTimeout(r, 800));
-        addLog("Filing Agent: Checking Schedule C consistency...");
-        setFilingProgress(10);
+        addLog("Filing Agent: Cross-referencing deductions against tax code...");
+        setFilingProgress(15);
         await new Promise(r => setTimeout(r, 800));
-        addLog("Filing Agent: Validating Social Security Numbers and TINs...");
-        setFilingProgress(25);
+        addLog("Filing Agent: Verifying SSN and TIN accuracy...");
+        setFilingProgress(30);
         await new Promise(r => setTimeout(r, 800));
         
-        // Granular Step 2: Packaging
-        addLog("Filing Agent: Generating PDF package (1040, Schedule C)...");
-        setFilingProgress(40);
+        // Granular Step 2: Packaging Return
+        addLog("Filing Agent: Packaging Return...");
+        setFilingProgress(45);
         await new Promise(r => setTimeout(r, 1000));
-        addLog("Filing Agent: Attaching digital signature...");
-        setFilingProgress(55);
+        addLog("Filing Agent: Compiling Form 1040 and schedules into submission packet...");
+        setFilingProgress(60);
         await new Promise(r => setTimeout(r, 800));
-        
-        // Granular Step 3: Archiving
-        setActiveAgent(AgentType.MEMORY);
-        addLog("Memory Agent: Encrypting and archiving documents to secure vault...");
+        addLog("Filing Agent: Applying digital signature...");
         setFilingProgress(70);
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 800));
         
-        // Granular Step 4: Transmission
+        // Granular Step 3: Archiving (Memory Agent)
+        setActiveAgent(AgentType.MEMORY);
+        addLog("Memory Agent: Archiving documents to secure vault...");
+        setFilingProgress(75);
+        await new Promise(r => setTimeout(r, 800));
+        
+        // Granular Step 4: Transmitting to IRS
         setActiveAgent(AgentType.FILING);
-        addLog("Filing Agent: Establishing secure connection to IRS E-File System...");
+        addLog("Filing Agent: Transmitting to IRS...");
         setFilingProgress(85);
         await new Promise(r => setTimeout(r, 1200));
-        addLog("Filing Agent: Transmitting return data (XML)...");
+        addLog("Filing Agent: Handshaking with IRS E-File Gateway...");
         setFilingProgress(95);
         await new Promise(r => setTimeout(r, 1500));
         
         // Completion
-        addLog("Filing Agent: 🚀 Return Accepted! IRS Ref: 2024-X99-AGNT");
+        addLog("Filing Agent: Confirmation Received! Ref: 2024-X99-AGNT");
         setFilingProgress(100);
         
         setAgentStatus(AgentStatus.SUCCESS);
@@ -282,6 +328,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
         setFilingComplete(true);
     };
     runFiling();
+  };
+
+  const handleRequestCPA = () => {
+    setShowCPAModal(false);
+    addLog("System: User requested CPA review. Handing off context to Partner Network...");
+    setTimeout(() => {
+        addLog("System: CPA Inquiry #9942 created. A professional will review within 24hrs.");
+        onAskAdvisor("I've requested a CPA review for my return. What should I expect next?");
+    }, 1000);
   };
 
   const handleDownload = () => {
@@ -385,9 +440,52 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                 <Upload className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-semibold text-slate-900">Upload Tax Documents</h3>
-              <p className="text-slate-500 mt-2 max-w-md mx-auto">
+              <p className="text-slate-500 mt-2 max-w-md mx-auto mb-6">
                 Drag and drop W-2s, 1099s, or receipts. The <strong>Intake Agent</strong> will automatically classify and extract data.
               </p>
+
+              <button 
+                type="button" 
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowTooltip(!showTooltip);
+                }}
+                className="relative z-10 inline-flex items-center gap-2 text-sm text-indigo-600 font-medium hover:text-indigo-700 bg-white/50 px-3 py-1.5 rounded-full border border-indigo-100 hover:bg-indigo-50 transition-colors"
+              >
+                <HelpCircle className="w-4 h-4" />
+                What can I upload?
+              </button>
+
+              {showTooltip && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 bg-white p-5 rounded-xl shadow-xl border border-slate-200 z-20 text-left animate-in zoom-in-95 duration-200 cursor-default" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowTooltip(false);
+                        }} 
+                        className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                    <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        Accepted Documents
+                    </h4>
+                    <ul className="text-sm text-slate-600 space-y-2 mb-4 list-disc pl-4">
+                        <li><strong>Income:</strong> W-2, 1099-NEC, 1099-INT</li>
+                        <li><strong>Expenses:</strong> Receipts, Invoices, Bank Statements</li>
+                        <li><strong>ID:</strong> Driver's License (for verification)</li>
+                    </ul>
+                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                        <h5 className="text-xs font-bold text-emerald-800 uppercase mb-1">Why upload?</h5>
+                        <p className="text-xs text-emerald-700 leading-relaxed">
+                            Our AI agents extract data with 100% accuracy, finding hidden deductions that manual entry might miss.
+                        </p>
+                    </div>
+                </div>
+              )}
             </div>
             
             <div className="flex justify-center">
@@ -418,11 +516,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                 <h3 className="font-semibold text-slate-800">Deductions Review</h3>
-                <span className="text-xs text-slate-500">Auto-generated by Advisor Agent</span>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500 hidden sm:inline">Auto-generated by Advisor Agent</span>
+                    <button 
+                        onClick={handleExportCSV}
+                        className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 px-2.5 py-1.5 rounded-md transition-colors shadow-sm"
+                        title="Export to CSV"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                        Export CSV
+                    </button>
+                </div>
               </div>
               <div className="divide-y divide-slate-100">
                 {deductions.map(deduction => (
-                  <div key={deduction.id} className="p-4 hover:bg-slate-50 transition-colors group">
+                  <div 
+                    key={deduction.id} 
+                    className={`p-4 transition-all duration-200 cursor-pointer border-b border-slate-50 last:border-0 ${expandedDeductionId === deduction.id ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}`}
+                    onClick={() => toggleDeduction(deduction.id)}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex items-start gap-3">
                         <div className="mt-1">
@@ -433,13 +545,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                           )}
                         </div>
                         <div>
-                          <div className="font-medium text-slate-900">{deduction.category}</div>
+                          <div className="flex items-center gap-2">
+                             <div className="font-medium text-slate-900">{deduction.category}</div>
+                             {expandedDeductionId === deduction.id ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                          </div>
                           <div className="text-sm text-slate-500">{deduction.description}</div>
-                          <button 
-                            onClick={() => onAskAdvisor(`Regarding the ${deduction.category} deduction of $${deduction.amount.toLocaleString()} that was identified: "${deduction.explanation}". Could you provide a detailed explanation of the IRS criteria for this and what documentation is required?`)}
-                            className="mt-2 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors active:scale-95"
+                          <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (expandedDeductionId !== deduction.id) {
+                                    setExpandedDeductionId(deduction.id);
+                                }
+                            }}
+                            className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-100 transition-colors"
                           >
-                            <Bot className="w-3 h-3" /> Explain My Return
+                            <Bot className="w-3 h-3" /> Explain
                           </button>
                         </div>
                       </div>
@@ -448,6 +568,47 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                         <div className="text-xs text-slate-400">{(deduction.confidence * 100).toFixed(0)}% Confidence</div>
                       </div>
                     </div>
+
+                    {expandedDeductionId === deduction.id && (
+                        <div className="mt-4 pt-3 border-t border-slate-200/50 animate-in slide-in-from-top-1">
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Source</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <FileText className="w-3.5 h-3.5 text-slate-500" />
+                                        <span className="text-xs font-medium text-slate-700 font-mono">{deduction.sourceDocId || 'System Generated'}</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Confidence Logic</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                            <div className={`h-full ${deduction.confidence > 0.9 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{width: `${deduction.confidence * 100}%`}}></div>
+                                        </div>
+                                        <span className="text-xs font-medium text-slate-700">AI Verified</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-indigo-50 rounded-lg p-3 text-sm text-indigo-900 border border-indigo-100 flex gap-3">
+                                <Bot className="w-5 h-5 text-indigo-600 shrink-0" />
+                                <div>
+                                    <span className="font-semibold block mb-0.5 text-indigo-700">Agent Explanation</span>
+                                    {deduction.explanation}
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={(e) => {
+                                e.stopPropagation();
+                                onAskAdvisor(`Regarding the ${deduction.category} deduction of $${deduction.amount.toLocaleString()} that was identified: "${deduction.explanation}". Could you provide a detailed explanation of the IRS criteria for this and what documentation is required?`)
+                                }}
+                                className="mt-3 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium transition-colors w-fit ml-auto"
+                            >
+                                <Bot className="w-3 h-3" /> Ask Advisor for more details
+                            </button>
+                        </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -501,6 +662,25 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                    </div>
                  ))
                 )}
+                
+                {/* CPA Call to Action */}
+                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                   <div className="flex items-center gap-3">
+                      <div className="bg-white p-2 rounded-full border border-slate-100 shadow-sm">
+                         <UserCheck className="w-5 h-5 text-slate-600" />
+                      </div>
+                      <div className="text-sm">
+                         <span className="block font-medium text-slate-900">Need professional assurance?</span>
+                         <span className="text-slate-500 text-xs">Have a CPA review these risks before filing.</span>
+                      </div>
+                   </div>
+                   <button 
+                      onClick={() => setShowCPAModal(true)}
+                      className="whitespace-nowrap bg-white text-slate-700 hover:text-indigo-600 border border-slate-300 hover:border-indigo-300 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                   >
+                      Consult with a CPA
+                   </button>
+                </div>
               </div>
             </div>
             
@@ -547,11 +727,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                         <p className="text-slate-500 mb-6">The Filing Agent is preparing and transmitting your data.</p>
                         
                         {/* Progress Indicator */}
-                        <div className="relative pt-1 mb-8">
+                        <div className="relative pt-1 mb-8 max-w-lg mx-auto">
                           <div className="flex mb-2 items-center justify-between">
                             <div>
                               <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-50">
-                                Filing Status
+                                Filing Progress
                               </span>
                             </div>
                             <div className="text-right">
@@ -560,9 +740,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                               </span>
                             </div>
                           </div>
-                          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-indigo-100">
-                            <div style={{ width: `${filingProgress}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-600 transition-all duration-500 ease-out"></div>
+                          <div className="overflow-hidden h-3 mb-2 text-xs flex rounded-full bg-slate-100 border border-slate-200">
+                            <div 
+                                style={{ width: `${filingProgress}%` }} 
+                                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-indigo-500 to-indigo-700 transition-all duration-700 ease-out relative"
+                            >
+                                <div className="absolute inset-0 bg-white/20 w-full h-full animate-pulse"></div>
+                            </div>
                           </div>
+                          
+                          {/* Active Action Display */}
+                           <div className="h-6 flex items-center justify-center">
+                                <span className="text-sm text-slate-600 font-medium flex items-center gap-2">
+                                    {filingProgress < 100 && <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />}
+                                    {logs.length > 0 && filingProgress < 100 
+                                        ? (logs[0].includes(':') ? logs[0].split(':')[1].trim() : logs[0]) 
+                                        : 'Initializing secure connection...'}
+                                </span>
+                           </div>
                         </div>
 
                     </div>
@@ -577,10 +772,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                         <h2 className="text-3xl font-bold text-slate-900">Return Filed!</h2>
                         <p className="text-emerald-600 font-medium mt-2">Accepted by IRS</p>
 
-                        <div className="mt-4 flex items-center justify-center gap-2">
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600">
-                              <Archive className="w-3.5 h-3.5 text-indigo-500" />
-                              <span>Permanently archived by <strong>Memory Agent</strong></span>
+                        <div className="mt-4 flex items-center justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 delay-300">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-xs font-medium text-emerald-700">
+                              <Archive className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Securely archived by <strong>Memory Agent</strong></span>
+                              <CheckCircle className="w-3 h-3 text-emerald-600 ml-1" />
                           </div>
                         </div>
                     </div>
@@ -797,6 +993,49 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
             </div>
             </div>
         </div>
+      )}
+
+      {/* CPA Consultation Modal */}
+      {showCPAModal && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+                <div className="bg-slate-50 p-6 border-b border-slate-200 text-center">
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-200 shadow-sm">
+                         <UserCheck className="w-6 h-6 text-slate-700" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-900">Connect with a Tax Professional</h3>
+                    <p className="text-slate-500 text-sm mt-1">
+                        Our AI has flagged potential risks. For complex situations, we recommend a human review.
+                    </p>
+                </div>
+                
+                <div className="p-6">
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
+                        <h4 className="font-semibold text-blue-900 text-sm mb-2 flex items-center gap-2">
+                            <Shield className="w-4 h-4" /> Secure Data Handoff
+                        </h4>
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                            By proceeding, you authorize AgenticAI to share your current return context (deductions, income, and flagged risks) with a certified partner from our CPA network.
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <button 
+                            onClick={handleRequestCPA}
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 rounded-lg transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2"
+                        >
+                            Request Human Review
+                        </button>
+                        <button 
+                            onClick={() => setShowCPAModal(false)}
+                            className="w-full bg-white text-slate-600 hover:bg-slate-50 font-medium py-3 rounded-lg transition-colors border border-slate-200"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+         </div>
       )}
     </div>
   );
