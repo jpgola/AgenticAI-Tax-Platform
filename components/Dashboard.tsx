@@ -707,7 +707,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
             </div>
 
             {/* Action Footer */}
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-between items-center pt-4">
+                 <div className="flex items-center gap-2">
+                     <button 
+                       onClick={() => setShowAuditModal(true)}
+                       className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm"
+                     >
+                       <ClipboardList className="w-4 h-4" /> Review Agent Actions
+                     </button>
+                     
+                     <button 
+                       onClick={() => setShowCPAModal(true)}
+                       className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm"
+                     >
+                       <UserCheck className="w-4 h-4" /> Consult CPA
+                     </button>
+                 </div>
+
                  <button 
                    onClick={handleApproveAndFile}
                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform"
@@ -821,6 +837,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                                 Dashboard
                             </button>
                         </div>
+
+                         <button 
+                           onClick={() => setShowAuditModal(true)}
+                           className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-indigo-600 py-2 text-sm font-medium hover:bg-slate-50 rounded-lg transition-colors"
+                         >
+                            <ClipboardList className="w-4 h-4" /> View Final Audit Log
+                         </button>
                     </div>
                  </div>
              )}
