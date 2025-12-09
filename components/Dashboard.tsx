@@ -344,7 +344,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
   };
 
   const handleDownloadConfirmation = () => {
-    alert("Downloading IRS_Confirmation_Receipt_2024-X99.pdf...");
+    const blob = new Blob(['%PDF-1.4\n%Mock PDF Content: IRS Confirmation Receipt\n\nReturn ID: 2024-X99-AGNT\nStatus: Accepted\nTimestamp: ' + new Date().toISOString()], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "IRS_Confirmation_Receipt_2024-X99.pdf";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
   return (
@@ -823,7 +831,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                            onClick={handleDownloadConfirmation}
                            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3.5 rounded-lg transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-bold text-base"
                         >
-                            <FileText className="w-5 h-5" /> Download Filing Confirmation
+                            <FileText className="w-5 h-5" /> Download Confirmation PDF
                         </button>
 
                         <div className="grid grid-cols-2 gap-3">
