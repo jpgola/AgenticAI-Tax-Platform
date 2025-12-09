@@ -3,10 +3,52 @@ import { HashRouter } from 'react-router-dom';
 import { LayoutDashboard, FileText, Settings, HelpCircle, Bell, Menu, X } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import AdvisorChat from './components/AdvisorChat';
+import { ChatMessage } from './types';
+import { sendMessageToGemini } from './services/geminiService';
 
 const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'model',
+      content: 'Hello! I am your AgenticAI Tax Advisor. I can help you find deductions, explain tax rules, or guide you through the filing process. How can I assist you today?',
+      timestamp: new Date()
+    }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const handleSendMessage = async (text: string) => {
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text,
+      timestamp: new Date()
+    };
+    setChatMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+        const responseText = await sendMessageToGemini(chatMessages, text);
+        const modelMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'model',
+          content: responseText,
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, modelMsg]);
+    } catch (error) {
+        console.error("Chat Error:", error);
+    } finally {
+        setIsTyping(false);
+    }
+  };
+
+  const handleAskAdvisor = (question: string) => {
+      setIsChatOpen(true);
+      handleSendMessage(question);
+  };
 
   return (
     <HashRouter>
@@ -65,7 +107,7 @@ const App: React.FC = () => {
 
           {/* Page Content */}
           <main className="flex-1 overflow-auto">
-            <Dashboard />
+            <Dashboard onAskAdvisor={handleAskAdvisor} />
           </main>
         </div>
 
@@ -86,7 +128,13 @@ const App: React.FC = () => {
         </div>
 
         {/* Chat Widget */}
-        <AdvisorChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <AdvisorChat 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)} 
+          messages={chatMessages}
+          onSendMessage={handleSendMessage}
+          isTyping={isTyping}
+        />
 
       </div>
     </HashRouter>

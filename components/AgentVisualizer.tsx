@@ -1,6 +1,6 @@
 import React from 'react';
 import { AgentType, AgentStatus } from '../types';
-import { Bot, FileText, CheckCircle, AlertTriangle, Loader2, Database, ShieldCheck } from 'lucide-react';
+import { Bot, FileText, CheckCircle, AlertTriangle, Loader2, Database, ShieldCheck, Send, Archive } from 'lucide-react';
 
 interface AgentVisualizerProps {
   activeAgent: AgentType | null;
@@ -16,6 +16,8 @@ const AgentVisualizer: React.FC<AgentVisualizerProps> = ({ activeAgent, status, 
       case AgentType.EXTRACTION: return <Database className="w-5 h-5" />;
       case AgentType.VALIDATION: return <ShieldCheck className="w-5 h-5" />;
       case AgentType.ADVISOR: return <Bot className="w-5 h-5" />;
+      case AgentType.FILING: return <Send className="w-5 h-5" />;
+      case AgentType.MEMORY: return <Archive className="w-5 h-5" />;
       default: return <Bot className="w-5 h-5" />;
     }
   };

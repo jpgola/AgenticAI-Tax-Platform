@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check } from 'lucide-react';
+import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AgentVisualizer from './AgentVisualizer';
 import { AgentType, AgentStatus, DeductionItem, TaxDocument, RiskItem } from '../types';
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onAskAdvisor: (question: string) => void;
+}
+
+interface AuditLogItem {
+  timestamp: Date;
+  message: string;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor }) => {
   const [activeAgent, setActiveAgent] = useState<AgentType | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(AgentStatus.IDLE);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [step, setStep] = useState(1); // 1: Intake, 2: Processing, 3: Review
+  const [logs, setLogs] = useState<string[]>([]); // For visualizer (newest first)
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]); // For audit trail (oldest first)
+  const [step, setStep] = useState(1); // 1: Intake, 2: Processing, 3: Review, 4: Filing
   const [documents, setDocuments] = useState<TaxDocument[]>([]);
   const [deductions, setDeductions] = useState<DeductionItem[]>([]);
   const [risks, setRisks] = useState<RiskItem[]>([]);
   const [showUploadGuide, setShowUploadGuide] = useState(true);
+  const [filingComplete, setFilingComplete] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [filingProgress, setFilingProgress] = useState(0);
 
   // Mock Data for Charts
   const data = [
@@ -20,14 +33,85 @@ const Dashboard: React.FC = () => {
     { name: 'AgenticAI Found', amount: 18240, type: 'ai' },
   ];
 
-  const addLog = (msg: string) => setLogs(prev => [msg, ...prev]);
+  const addLog = (msg: string) => {
+      setLogs(prev => [msg, ...prev]);
+      setAuditLogs(prev => [...prev, { timestamp: new Date(), message: msg }]);
+  };
+
+  const handleRunDemo = () => {
+    // Populate Audit Logs
+    const demoLogs = [
+        "Intake Agent: Detected 1099-NEC from 'TechStream Inc'.",
+        "Extraction Agent: OCR Parsing successful. Income: $48,500.",
+        "Memory Agent: Retrieved previous year return (Schedule C).",
+        "Advisor Agent: Cross-referenced bank feed 'Chase Business'.",
+        "Advisor Agent: Identified Home Office deduction based on address match.",
+        "Advisor Agent: Flagged high Travel expenses for review.",
+        "Validation Agent: TIN matched against IRS database."
+    ];
+    
+    setLogs(demoLogs);
+    setAuditLogs(demoLogs.map(msg => ({ timestamp: new Date(), message: msg })));
+
+    // Populate Documents
+    setDocuments([{
+        id: 'demo-doc-1',
+        name: '1099-NEC_TechStream.pdf',
+        type: '1099-NEC',
+        status: 'verified',
+        uploadDate: new Date().toLocaleDateString()
+    }]);
+
+    // Populate Deductions
+    setDeductions([
+        { 
+          id: 'd1', 
+          category: 'Home Office', 
+          amount: 1450, 
+          description: 'Simplified method (300 sq ft)', 
+          confidence: 0.95,
+          explanation: 'Your address has remained consistent, and you are a 1099 contractor. The simplified method is low-risk.'
+        },
+        { 
+          id: 'd2', 
+          category: 'Equipment', 
+          amount: 2899, 
+          description: 'MacBook Pro 16" & Peripherals', 
+          confidence: 0.98,
+          explanation: 'Found purchase in "Best Buy" transaction log on Dec 12th. Fully deductible as business equipment.'
+        },
+        { 
+          id: 'd3', 
+          category: 'Travel', 
+          amount: 3200, 
+          description: 'Flight/Hotel for TechConf 2024', 
+          confidence: 0.85,
+          explanation: 'Transactions match conference dates. Ensure you keep the conference agenda as proof of business intent.'
+        }
+    ]);
+
+    // Populate Risks
+    setRisks([
+        {
+          id: 'r1',
+          category: 'High Travel Expenses',
+          severity: 'medium',
+          description: 'Travel expenses are 7% of gross income.',
+          mitigation: 'I have linked these expenses to the "TechConf 2024" calendar entry found in your metadata.'
+        }
+    ]);
+
+    setAgentStatus(AgentStatus.SUCCESS);
+    setStep(3); // Jump to review
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setStep(2);
-    setLogs([]); // Clear logs for new process
+    setLogs([]); // Clear visualizer logs
+    setAuditLogs([]); // Clear audit logs for new session
 
     // Simulate Agentic Workflow
     const runWorkflow = async () => {
@@ -115,6 +199,46 @@ const Dashboard: React.FC = () => {
     runWorkflow();
   };
 
+  const handleApproveAndFile = () => {
+    setStep(4);
+    setLogs([]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    const runFiling = async () => {
+        setFilingProgress(0);
+        setActiveAgent(AgentType.FILING);
+        setAgentStatus(AgentStatus.WORKING);
+        addLog("Filing Agent: Validating return integrity...");
+        setFilingProgress(20);
+        await new Promise(r => setTimeout(r, 1500));
+        
+        addLog("Filing Agent: Generating PDF package (1040, Schedule C)...");
+        setFilingProgress(50);
+        await new Promise(r => setTimeout(r, 1500));
+        
+        setActiveAgent(AgentType.MEMORY);
+        addLog("Memory Agent: Encrypting and archiving documents to secure vault...");
+        setFilingProgress(75);
+        await new Promise(r => setTimeout(r, 1200));
+        
+        setActiveAgent(AgentType.FILING);
+        addLog("Filing Agent: Connecting to IRS E-File System...");
+        setFilingProgress(90);
+        await new Promise(r => setTimeout(r, 1500));
+        addLog("Filing Agent: 🚀 Return Accepted! IRS Ref: 2024-X99-AGNT");
+        setFilingProgress(100);
+        
+        setAgentStatus(AgentStatus.SUCCESS);
+        setActiveAgent(null);
+        setFilingComplete(true);
+    };
+    runFiling();
+  };
+
+  const handleDownload = () => {
+    alert("Downloading tax_return_2024.pdf...");
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
       
@@ -124,7 +248,18 @@ const Dashboard: React.FC = () => {
         {/* Progress Header */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-900">2024 Tax Return</h2>
+            <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-slate-900">2024 Tax Return</h2>
+                {auditLogs.length > 0 && (
+                    <button 
+                        onClick={() => setShowAuditModal(true)}
+                        className="text-xs flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 bg-white border border-slate-200 px-2 py-1 rounded-md transition-colors shadow-sm"
+                    >
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        Audit Trail
+                    </button>
+                )}
+            </div>
             <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
               Estimated Refund: $2,840
             </span>
@@ -132,14 +267,14 @@ const Dashboard: React.FC = () => {
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-indigo-600 h-full transition-all duration-1000 ease-out" 
-              style={{ width: step === 1 ? '10%' : step === 2 ? '50%' : '90%' }}
+              style={{ width: step === 1 ? '10%' : step === 2 ? '50%' : step === 3 ? '90%' : '100%' }}
             />
           </div>
           <div className="flex justify-between mt-2 text-xs text-slate-500 font-medium">
             <span className={step >= 1 ? 'text-indigo-600' : ''}>Intake</span>
             <span className={step >= 2 ? 'text-indigo-600' : ''}>Processing</span>
             <span className={step >= 3 ? 'text-indigo-600' : ''}>Review</span>
-            <span>File</span>
+            <span className={step >= 4 ? 'text-indigo-600' : ''}>File</span>
           </div>
         </div>
 
@@ -195,6 +330,16 @@ const Dashboard: React.FC = () => {
                 Drag and drop W-2s, 1099s, or receipts. The <strong>Intake Agent</strong> will automatically classify and extract data.
               </p>
             </div>
+            
+            <div className="flex justify-center">
+                <button 
+                  onClick={handleRunDemo}
+                  className="group flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors text-sm font-medium px-4 py-2 rounded-full hover:bg-white hover:shadow-sm"
+                >
+                    <PlayCircle className="w-4 h-4" />
+                    Don't have a file? Load Demo Scenario
+                </button>
+            </div>
           </div>
         )}
 
@@ -231,9 +376,12 @@ const Dashboard: React.FC = () => {
                         <div>
                           <div className="font-medium text-slate-900">{deduction.category}</div>
                           <div className="text-sm text-slate-500">{deduction.description}</div>
-                          <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 p-2 rounded border border-indigo-100 hidden group-hover:block animate-in fade-in">
-                            <strong>Why?</strong> {deduction.explanation}
-                          </div>
+                          <button 
+                            onClick={() => onAskAdvisor(`Can you explain why I qualify for the ${deduction.category} deduction of $${deduction.amount.toLocaleString()}?`)}
+                            className="mt-2 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors"
+                          >
+                            <Bot className="w-3 h-3" /> Explain with Advisor Agent
+                          </button>
                         </div>
                       </div>
                       <div className="text-right">
@@ -306,10 +454,80 @@ const Dashboard: React.FC = () => {
 
             {/* Action Footer */}
             <div className="flex justify-end pt-4">
-                 <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform">
+                 <button 
+                   onClick={handleApproveAndFile}
+                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform"
+                 >
                    Approve & File Return <ArrowRight className="w-4 h-4" />
                  </button>
             </div>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 min-h-[400px] flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+             {!filingComplete ? (
+                 <div className="w-full max-w-2xl">
+                    <div className="mb-8 text-center">
+                        <h3 className="text-2xl font-bold text-slate-800 mb-2">Finalizing Your Return</h3>
+                        <p className="text-slate-500 mb-6">The Filing Agent is preparing and transmitting your data.</p>
+                        
+                        {/* Progress Indicator */}
+                        <div className="relative pt-1 mb-8">
+                          <div className="flex mb-2 items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-50">
+                                Filing Status
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-semibold inline-block text-indigo-600">
+                                {filingProgress}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-indigo-100">
+                            <div style={{ width: `${filingProgress}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-600 transition-all duration-500 ease-out"></div>
+                          </div>
+                        </div>
+
+                    </div>
+                    <AgentVisualizer activeAgent={activeAgent} status={agentStatus} logs={logs} />
+                 </div>
+             ) : (
+                 <div className="max-w-md w-full space-y-6 animate-in slide-in-from-bottom-5 duration-500">
+                    <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                        <CheckCheck className="w-12 h-12 text-emerald-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-900">Return Filed!</h2>
+                        <p className="text-emerald-600 font-medium mt-2">Accepted by IRS • Ref #2024-X99-AGNT</p>
+                    </div>
+                    
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-left space-y-3">
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                             <span className="text-slate-500 text-sm">Federal Refund</span>
+                             <span className="font-bold text-slate-900 text-lg">$2,840.00</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                             <span className="text-slate-500 text-sm">Filing Date</span>
+                             <span className="font-medium text-slate-900">{new Date().toLocaleDateString()}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                           onClick={handleDownload}
+                           className="flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                            <Download className="w-4 h-4" /> Download PDF
+                        </button>
+                        <button onClick={() => window.location.reload()} className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors">
+                            Dashboard
+                        </button>
+                    </div>
+                 </div>
+             )}
           </div>
         )}
 
@@ -335,8 +553,13 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Agent Visualizer (Persistent in Sidebar if not main view) */}
-        {step !== 2 && (
+        {step !== 2 && step !== 4 && (
              <AgentVisualizer activeAgent={activeAgent} status={agentStatus} logs={logs} />
+        )}
+        
+        {/* Allow seeing visualizer on side if step 4 is finished, for history context */}
+        {step === 4 && filingComplete && (
+            <AgentVisualizer activeAgent={null} status={AgentStatus.SUCCESS} logs={logs} />
         )}
 
         {/* Uploaded Docs List */}
@@ -363,6 +586,74 @@ const Dashboard: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Audit Trail Modal */}
+      {showAuditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                <div className="bg-indigo-100 p-2 rounded-lg">
+                    <ClipboardList className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-slate-900">System Audit Trail</h3>
+                    <p className="text-xs text-slate-500">Session ID: {documents[0]?.id || 'INIT-SESSION'}</p>
+                </div>
+                </div>
+                <button onClick={() => setShowAuditModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+                </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-0">
+                <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase bg-slate-50 sticky top-0">
+                    <tr>
+                    <th className="px-6 py-3 border-b border-slate-200">Time</th>
+                    <th className="px-6 py-3 border-b border-slate-200">Agent</th>
+                    <th className="px-6 py-3 border-b border-slate-200">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {auditLogs.map((log, idx) => {
+                    const parts = log.message.split(':');
+                    const agent = parts.length > 1 ? parts[0] : 'System';
+                    const action = parts.length > 1 ? parts.slice(1).join(':') : parts[0];
+                    return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-500 text-xs">
+                            {log.timestamp.toLocaleTimeString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                            ${agent.includes('Intake') ? 'bg-blue-50 text-blue-700' : 
+                                agent.includes('Extraction') ? 'bg-purple-50 text-purple-700' :
+                                agent.includes('Advisor') ? 'bg-indigo-50 text-indigo-700' :
+                                agent.includes('Validation') ? 'bg-amber-50 text-amber-700' :
+                                agent.includes('Filing') ? 'bg-emerald-50 text-emerald-700' :
+                                'bg-slate-100 text-slate-700'
+                            }`}>
+                            {agent}
+                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-700">
+                            {action}
+                        </td>
+                        </tr>
+                    );
+                    })}
+                </tbody>
+                </table>
+                {auditLogs.length === 0 && <div className="p-8 text-center text-slate-500">No logs recorded yet.</div>}
+            </div>
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                <button onClick={() => setShowAuditModal(false)} className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 text-sm hover:bg-slate-50 font-medium shadow-sm">
+                Close
+                </button>
+            </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,55 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, AlertTriangle, X } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { sendMessageToGemini } from '../services/geminiService';
 
 interface AdvisorChatProps {
   isOpen: boolean;
   onClose: () => void;
+  messages: ChatMessage[];
+  onSendMessage: (message: string) => void;
+  isTyping: boolean;
 }
 
-const AdvisorChat: React.FC<AdvisorChatProps> = ({ isOpen, onClose }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'model',
-      content: 'Hello! I am your AgenticAI Tax Advisor. I can help you find deductions, explain tax rules, or guide you through the filing process. How can I assist you today?',
-      timestamp: new Date()
-    }
-  ]);
+const AdvisorChat: React.FC<AdvisorChatProps> = ({ isOpen, onClose, messages, onSendMessage, isTyping }) => {
   const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMsg]);
+  const handleSend = () => {
+    if (!input.trim() || isTyping) return;
+    onSendMessage(input);
     setInput('');
-    setIsTyping(true);
-
-    const responseText = await sendMessageToGemini(messages, input);
-
-    const modelMsg: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'model',
-      content: responseText,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, modelMsg]);
-    setIsTyping(false);
   };
 
   if (!isOpen) return null;
