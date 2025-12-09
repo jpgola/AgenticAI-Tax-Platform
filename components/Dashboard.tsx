@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle } from 'lucide-react';
+import { Upload, CheckCircle, FileText, DollarSign, Clock, ArrowRight, Shield, AlertCircle, Info, X, ShieldAlert, Check, Bot, CheckCheck, Download, ClipboardList, PlayCircle, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import AgentVisualizer from './AgentVisualizer';
 import { AgentType, AgentStatus, DeductionItem, TaxDocument, RiskItem } from '../types';
@@ -216,23 +216,41 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
         setFilingProgress(0);
         setActiveAgent(AgentType.FILING);
         setAgentStatus(AgentStatus.WORKING);
-        addLog("Filing Agent: Validating return integrity...");
-        setFilingProgress(20);
-        await new Promise(r => setTimeout(r, 1500));
         
+        // Granular Step 1: Validation
+        addLog("Filing Agent: Initiating final validation sequence...");
+        await new Promise(r => setTimeout(r, 800));
+        addLog("Filing Agent: Checking Schedule C consistency...");
+        setFilingProgress(10);
+        await new Promise(r => setTimeout(r, 800));
+        addLog("Filing Agent: Validating Social Security Numbers and TINs...");
+        setFilingProgress(25);
+        await new Promise(r => setTimeout(r, 800));
+        
+        // Granular Step 2: Packaging
         addLog("Filing Agent: Generating PDF package (1040, Schedule C)...");
-        setFilingProgress(50);
-        await new Promise(r => setTimeout(r, 1500));
+        setFilingProgress(40);
+        await new Promise(r => setTimeout(r, 1000));
+        addLog("Filing Agent: Attaching digital signature...");
+        setFilingProgress(55);
+        await new Promise(r => setTimeout(r, 800));
         
+        // Granular Step 3: Archiving
         setActiveAgent(AgentType.MEMORY);
         addLog("Memory Agent: Encrypting and archiving documents to secure vault...");
-        setFilingProgress(75);
-        await new Promise(r => setTimeout(r, 1200));
+        setFilingProgress(70);
+        await new Promise(r => setTimeout(r, 1000));
         
+        // Granular Step 4: Transmission
         setActiveAgent(AgentType.FILING);
-        addLog("Filing Agent: Connecting to IRS E-File System...");
-        setFilingProgress(90);
+        addLog("Filing Agent: Establishing secure connection to IRS E-File System...");
+        setFilingProgress(85);
+        await new Promise(r => setTimeout(r, 1200));
+        addLog("Filing Agent: Transmitting return data (XML)...");
+        setFilingProgress(95);
         await new Promise(r => setTimeout(r, 1500));
+        
+        // Completion
         addLog("Filing Agent: 🚀 Return Accepted! IRS Ref: 2024-X99-AGNT");
         setFilingProgress(100);
         
@@ -268,9 +286,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                     </button>
                 )}
             </div>
-            <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-              Estimated Refund: $2,840
-            </span>
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-sm font-semibold text-emerald-700">
+                  Estimated Refund: <span className="font-bold">$2,840</span>
+                </span>
+            </div>
           </div>
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
             <div 
@@ -385,10 +409,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                           <div className="font-medium text-slate-900">{deduction.category}</div>
                           <div className="text-sm text-slate-500">{deduction.description}</div>
                           <button 
-                            onClick={() => onAskAdvisor(`Can you explain why I qualify for the ${deduction.category} deduction of $${deduction.amount.toLocaleString()}?`)}
+                            onClick={() => onAskAdvisor(`Please provide a detailed explanation for the ${deduction.category} deduction of $${deduction.amount.toLocaleString()}. Explain the specific IRS criteria I met based on my documents and any documentation requirements I should maintain.`)}
                             className="mt-2 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 transition-colors"
                           >
-                            <Bot className="w-3 h-3" /> Explain with Advisor Agent
+                            <Bot className="w-3 h-3" /> Explain My Return
                           </button>
                         </div>
                       </div>
@@ -409,7 +433,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                 <h3 className="font-semibold text-slate-800">Audit Risk Analysis</h3>
               </div>
               <div className="p-4 grid gap-4">
-                 {risks.map(risk => (
+                 {risks.length === 0 ? (
+                    <div className="text-center p-6 text-slate-500 text-sm flex flex-col items-center">
+                      <ShieldCheck className="w-12 h-12 text-emerald-100 bg-emerald-50 p-2 rounded-full mb-3" />
+                      <p>No significant audit risks detected by the Advisor Agent.</p>
+                      <p className="text-xs text-slate-400 mt-1">Your return appears consistent with IRS guidelines.</p>
+                    </div>
+                 ) : (
+                    risks.map(risk => (
                    <div key={risk.id} className={`border rounded-lg p-4 ${risk.severity === 'medium' ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5">
@@ -431,10 +462,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                              <div className="shrink-0 pt-0.5"><Shield className="w-3 h-3 text-indigo-500" /></div>
                              <span className="text-slate-500"><strong className="text-indigo-600">Advisor Agent:</strong> {risk.mitigation}</span>
                           </div>
+
+                          <button 
+                            onClick={() => onAskAdvisor(`I'm concerned about the '${risk.category}' risk. Can you explain why it was flagged and how to fix it?`)}
+                            className="mt-3 text-xs flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                          >
+                            <Bot className="w-3 h-3" /> Discuss with Advisor
+                          </button>
                         </div>
                       </div>
                    </div>
-                 ))}
+                 ))
+                )}
               </div>
             </div>
             
@@ -526,11 +565,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onAskAdvisor, onContextUpdate }) 
                     <div className="grid grid-cols-2 gap-3">
                         <button 
                            onClick={handleDownload}
-                           className="flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors"
+                           className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 font-medium"
                         >
-                            <Download className="w-4 h-4" /> Download PDF
+                            <Download className="w-4 h-4" /> Download Return PDF
                         </button>
-                        <button onClick={() => window.location.reload()} className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors">
+                        <button onClick={() => window.location.reload()} className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors font-medium">
                             Dashboard
                         </button>
                     </div>
